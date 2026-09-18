@@ -535,7 +535,7 @@ export const WhatIfView: React.FC<WhatIfViewProps> = ({
           <div className="rounded-xl border border-slate-800 bg-slate-950/90 p-3.5 space-y-1">
             <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-400">
               <Sparkles className="h-3.5 w-3.5" />
-              <span>Cognee Cloud 3 Financial Reasoning</span>
+              <span>Groq AI Financial Reasoning</span>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed">
               {impact?.aiExplanation}

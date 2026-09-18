@@ -64,7 +64,7 @@ export const DemoTourModal: React.FC<DemoTourModalProps> = ({
     {
       step: 4,
       title: 'Live Impact & AI Grounded Explanation',
-      desc: 'Watch balance drop to ₹25,000 and projected buffer to ₹6,500. Read Cognee Cloud 3 explanation of why Week 3 pressure increases.',
+      desc: 'Watch balance drop to ₹25,000 and projected buffer to ₹6,500. Read Groq AI explanation of why Week 3 pressure increases.',
       actionLabel: 'View What-If Engine',
       action: () => {
         onNavigateTab('whatif');

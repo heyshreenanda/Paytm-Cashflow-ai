@@ -28,7 +28,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onFetchReportData }) =
     'Analyzing transactions',
     'Calculating cash flow',
     'Preparing visualizations',
-    'Generating AI summary (Cognee Cloud 3)',
+    'Generating AI summary (Groq AI)',
     'Creating PDF vector document',
   ];
 
@@ -226,7 +226,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ onFetchReportData }) =
           {/* Section 2: AI Financial Brief */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-400">
-              2. AI Financial Brief (Cognee Cloud 3)
+              2. AI Financial Brief (Groq AI)
             </h3>
             <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4 text-xs text-slate-300 leading-relaxed space-y-2">
               <p>{report.aiFinancialBrief}</p>

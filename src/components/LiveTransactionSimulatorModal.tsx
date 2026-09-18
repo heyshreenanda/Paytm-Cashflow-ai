@@ -334,7 +334,7 @@ export const LiveTransactionSimulatorModal: React.FC<LiveTransactionSimulatorMod
               </div>
             </div>
 
-            {/* AI Explanation Box (Cognee Cloud 3 / Fallback) */}
+            {/* AI Explanation Box (Groq AI / Fallback) */}
             <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-3.5">
               <div className="flex items-center gap-2 text-xs font-bold text-cyan-400 mb-1.5">
                 <Sparkles className="h-4 w-4" />

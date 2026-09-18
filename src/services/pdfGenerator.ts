@@ -98,7 +98,7 @@ export function generateFinancialPDF(report: ReportData): jsPDF {
   y += cardHeight + 8;
 
   // -------------------------------------------------------------
-  // 2. AI FINANCIAL BRIEF (COGNEE CLOUD 3 / FALLBACK)
+  // 2. AI FINANCIAL BRIEF (GROQ AI / FALLBACK)
   // -------------------------------------------------------------
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);

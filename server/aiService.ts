@@ -238,20 +238,23 @@ During this review period, Rahul Sharma maintained an active balance of ₹${con
 }
 
 /**
- * CogneeCloudService: Implements Cognee Cloud 3 / OpenAI-compatible API integration with Gemini fallback.
+ * GroqAIService: Implements Groq AI / OpenAI-compatible API integration with Gemini fallback.
  * Automatically handles /chat/completions endpoints, models like Qwen / Llama / Gemini, and deterministic reasoning.
  */
-export class CogneeCloudService implements AIService {
+export class GroqAIService implements AIService {
   private fallback = new FallbackAIService();
-  private apiKey = process.env.COGNEE_CLOUD_API_KEY;
-  private baseUrl = process.env.COGNEE_CLOUD_BASE_URL || 'https://api.cognee.ai/v1';
+  private apiKey = process.env.GROQ_API_KEY || process.env.COGNEE_CLOUD_API_KEY;
+  private baseUrl =
+    process.env.GROQ_BASE_URL ||
+    process.env.COGNEE_CLOUD_BASE_URL ||
+    'https://api.groq.com/openai/v1';
 
   private isConfigured(): boolean {
     return Boolean(this.apiKey && this.apiKey.trim().length > 0);
   }
 
   private async callChatCompletion(systemPrompt: string, userPrompt: string, maxTokens = 250): Promise<string | null> {
-    // 1. Try Cognee Cloud / OpenAI-compatible endpoint
+    // 1. Try Groq / OpenAI-compatible endpoint
     if (this.isConfigured()) {
       try {
         const cleanBase = this.baseUrl.replace(/\/+$/, '');
@@ -266,7 +269,7 @@ export class CogneeCloudService implements AIService {
             Authorization: `Bearer ${this.apiKey}`,
           },
           body: JSON.stringify({
-            model: process.env.COGNEE_MODEL || 'qwen/qwen3.8-27b',
+            model: process.env.GROQ_MODEL || process.env.COGNEE_MODEL || 'qwen/qwen3.8-27b',
             messages: [
               { role: 'system', content: systemPrompt },
               { role: 'user', content: userPrompt },
@@ -431,4 +434,5 @@ Answer in 2-3 helpful, precise sentences. Always include exact rupee figures whe
   }
 }
 
-export const aiService: AIService = new CogneeCloudService();
+export const CogneeCloudService = GroqAIService;
+export const aiService: AIService = new GroqAIService();

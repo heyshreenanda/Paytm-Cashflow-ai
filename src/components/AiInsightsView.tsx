@@ -54,7 +54,7 @@ export const AiInsightsView: React.FC<AiInsightsViewProps> = ({
           <h1 className="text-xl font-bold text-white tracking-tight sm:text-2xl flex items-center gap-2">
             <span>AI Cash-Flow Insights</span>
             <span className="rounded-full bg-cyan-500/10 border border-cyan-500/30 px-2.5 py-0.5 text-xs font-bold text-cyan-400">
-              Cognee Cloud 3
+              Groq AI
             </span>
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
