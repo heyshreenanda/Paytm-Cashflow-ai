@@ -341,10 +341,10 @@ async function startServer() {
     res.json({ success: true, commitment: newCommitment, commitments: store.commitments });
   });
 
-  // 9. Report Data Generator
-  app.post('/api/reports/data', async (req, res) => {
+  // 9. Report Data Generator (handles GET and POST for /api/report and /api/reports/data)
+  const handleReportGeneration = async (req: express.Request, res: express.Response) => {
     try {
-      const { period = 'monthly' } = req.body;
+      const period = (req.query.period as string) || req.body?.period || 'monthly';
       const periodMap: Record<string, string> = {
         today: 'Today (18 Sep 2026)',
         last10days: 'Last 10 Days (8 Sep – 18 Sep 2026)',
@@ -420,6 +420,7 @@ async function startServer() {
         ],
         transactions: store.transactions.slice(0, 15),
         hasSimulation: Boolean(store.activeSimulationTx),
+        simulationDetails: null,
       };
 
       res.json({ success: true, report: reportData });
@@ -427,7 +428,12 @@ async function startServer() {
       console.error('Error generating report data:', err);
       res.status(500).json({ error: err.message || 'Report data generation error' });
     }
-  });
+  };
+
+  app.get('/api/report', handleReportGeneration);
+  app.post('/api/report', handleReportGeneration);
+  app.get('/api/reports/data', handleReportGeneration);
+  app.post('/api/reports/data', handleReportGeneration);
 
   // Vite middleware for development vs static serve for production
   if (process.env.NODE_ENV !== 'production') {

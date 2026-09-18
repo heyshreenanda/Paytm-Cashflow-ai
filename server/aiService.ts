@@ -238,8 +238,8 @@ During this review period, Rahul Sharma maintained an active balance of ₹${con
 }
 
 /**
- * CogneeCloudService: Implements Cognee Cloud 3 API integration.
- * Gracefully falls back to FallbackAIService if key is missing or network fails.
+ * CogneeCloudService: Implements Cognee Cloud 3 / OpenAI-compatible API integration with Gemini fallback.
+ * Automatically handles /chat/completions endpoints, models like Qwen / Llama / Gemini, and deterministic reasoning.
  */
 export class CogneeCloudService implements AIService {
   private fallback = new FallbackAIService();
@@ -250,102 +250,111 @@ export class CogneeCloudService implements AIService {
     return Boolean(this.apiKey && this.apiKey.trim().length > 0);
   }
 
+  private async callChatCompletion(systemPrompt: string, userPrompt: string, maxTokens = 250): Promise<string | null> {
+    // 1. Try Cognee Cloud / OpenAI-compatible endpoint
+    if (this.isConfigured()) {
+      try {
+        const cleanBase = this.baseUrl.replace(/\/+$/, '');
+        const completionsUrl = cleanBase.endsWith('/chat/completions')
+          ? cleanBase
+          : `${cleanBase}/chat/completions`;
+
+        const response = await fetch(completionsUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify({
+            model: process.env.COGNEE_MODEL || 'qwen/qwen3.8-27b',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt },
+            ],
+            max_tokens: maxTokens,
+            temperature: 0.3,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const content = data.choices?.[0]?.message?.content?.trim();
+          if (content) return content;
+        }
+      } catch {
+        // Proceed to Gemini fallback
+      }
+    }
+
+    // 2. Try Gemini 3.6 Flash if GEMINI_API_KEY is configured
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.6-flash',
+          contents: `${systemPrompt}\n\nUser request: ${userPrompt}`,
+        });
+        if (response.text) return response.text.trim();
+      } catch {
+        // Proceed to deterministic fallback
+      }
+    }
+
+    return null;
+  }
+
   async explainTransactionSimulation(context: StructuredFinancialContext): Promise<string> {
-    if (!this.isConfigured()) {
-      return this.fallback.explainTransactionSimulation(context);
+    const amount = context.scenario?.amount || 3000;
+    const cat = context.scenario?.category || 'Shopping';
+    const currentBuf = context.projectedBuffer;
+    const newBuf = context.scenarioImpact?.newProjectedBuffer ?? (currentBuf - amount);
+
+    const systemPrompt = `You are a financial AI advisor for Paytm CashFlow AI. Explain the cash-flow impact of a simulated transaction in 2 concise, professional sentences. Refer to the user's Week 3 liquidity floor, Rent due on 5th (₹12,000), and EMI on 12th (₹6,500).`;
+    const userPrompt = `Simulated transaction: ₹${amount} spent on ${cat}. Current buffer: ₹${currentBuf}, new buffer after spend: ₹${newBuf}. Lowest balance: ₹${context.lowestProjectedBalance}.`;
+
+    const aiExplanation = await this.callChatCompletion(systemPrompt, userPrompt, 180);
+    if (aiExplanation) {
+      return aiExplanation;
     }
-    try {
-      const response = await fetch(`${this.baseUrl}/cognition/explain`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          task: 'transaction_simulation_explanation',
-          context,
-        }),
-      });
-      if (!response.ok) throw new Error(`Cognee Cloud responded with status ${response.status}`);
-      const data = await response.json();
-      return data.explanation || this.fallback.explainTransactionSimulation(context);
-    } catch (err) {
-      console.warn('Cognee Cloud 3 call failed, utilizing deterministic fallback:', err);
-      return this.fallback.explainTransactionSimulation(context);
-    }
+    return this.fallback.explainTransactionSimulation(context);
   }
 
   async explainScenario(context: StructuredFinancialContext): Promise<string> {
-    if (!this.isConfigured()) {
-      return this.fallback.explainScenario(context);
+    const type = context.scenario?.type || 'transaction';
+    const amount = context.scenario?.amount || 5000;
+    const impact = context.scenarioImpact;
+
+    const systemPrompt = `You are a financial AI advisor for Paytm CashFlow AI. Explain the outcome of a what-if scenario in 2 concise sentences with rupee figures.`;
+    const userPrompt = `Scenario type: ${type}, Amount: ₹${amount}. Buffer delta: ₹${impact?.projectedBufferDelta}, New buffer: ₹${impact?.newProjectedBuffer}, Lowest projected floor: ₹${impact?.lowestBalance}.`;
+
+    const aiExplanation = await this.callChatCompletion(systemPrompt, userPrompt, 180);
+    if (aiExplanation) {
+      return aiExplanation;
     }
-    try {
-      const response = await fetch(`${this.baseUrl}/cognition/explain`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          task: 'scenario_explanation',
-          context,
-        }),
-      });
-      if (!response.ok) throw new Error(`Cognee Cloud responded with status ${response.status}`);
-      const data = await response.json();
-      return data.explanation || this.fallback.explainScenario(context);
-    } catch (err) {
-      return this.fallback.explainScenario(context);
-    }
+    return this.fallback.explainScenario(context);
   }
 
   async explainCashFlowPressure(context: StructuredFinancialContext): Promise<string> {
-    if (!this.isConfigured()) {
-      return this.fallback.explainCashFlowPressure(context);
+    const systemPrompt = `You are Paytm CashFlow AI advisor. Explain why Week 3 is the peak pressure period in 2 concise sentences.`;
+    const userPrompt = `Rent ₹12,000 cleared 5th, Appliance EMI ₹6,500 cleared 12th, broadband utility ₹1,500 due 20th, and annual health insurance ₹12,000 due 25th. Lowest balance is ₹${context.lowestProjectedBalance}.`;
+
+    const aiExplanation = await this.callChatCompletion(systemPrompt, userPrompt, 160);
+    if (aiExplanation) {
+      return aiExplanation;
     }
-    try {
-      const response = await fetch(`${this.baseUrl}/cognition/explain`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          task: 'cash_flow_pressure',
-          context,
-        }),
-      });
-      if (!response.ok) throw new Error(`Cognee Cloud responded with status ${response.status}`);
-      const data = await response.json();
-      return data.explanation || this.fallback.explainCashFlowPressure(context);
-    } catch (err) {
-      return this.fallback.explainCashFlowPressure(context);
-    }
+    return this.fallback.explainCashFlowPressure(context);
   }
 
   async generateReportSummary(context: StructuredFinancialContext, periodLabel: string): Promise<string> {
-    if (!this.isConfigured()) {
-      return this.fallback.generateReportSummary(context, periodLabel);
+    const systemPrompt = `You are an executive financial analyst for Paytm CashFlow AI. Write a concise executive financial summary (3-4 sentences) for the user's ${periodLabel} report. Ground everything in: Balance ₹${context.currentBalance}, Monthly salary ₹${context.monthlyIncome}, Fixed commitments ₹32,000, Projected buffer ₹${context.projectedBuffer}, Week 3 lowest floor ₹${context.lowestProjectedBalance}.`;
+    const userPrompt = `Generate the executive brief for Rahul Sharma for period ${periodLabel}.`;
+
+    const aiSummary = await this.callChatCompletion(systemPrompt, userPrompt, 220);
+    if (aiSummary) {
+      return aiSummary;
     }
-    try {
-      const response = await fetch(`${this.baseUrl}/cognition/summary`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          task: 'financial_report_summary',
-          period: periodLabel,
-          context,
-        }),
-      });
-      if (!response.ok) throw new Error(`Cognee Cloud responded with status ${response.status}`);
-      const data = await response.json();
-      return data.summary || this.fallback.generateReportSummary(context, periodLabel);
-    } catch (err) {
-      return this.fallback.generateReportSummary(context, periodLabel);
-    }
+    return this.fallback.generateReportSummary(context, periodLabel);
   }
 
   async handleCopilotQuery(
@@ -360,34 +369,65 @@ export class CogneeCloudService implements AIService {
     };
     groundedFacts: string[];
   }> {
-    if (!this.isConfigured()) {
-      return this.fallback.handleCopilotQuery(query, context);
-    }
-    try {
-      const response = await fetch(`${this.baseUrl}/cognition/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          query,
-          context,
-        }),
-      });
-      if (!response.ok) throw new Error(`Cognee Cloud responded with status ${response.status}`);
-      const data = await response.json();
-      return {
-        answer: data.answer || 'Forecasts and insights updated according to demo financial data.',
-        actionSuggestion: data.actionSuggestion,
-        groundedFacts: data.groundedFacts || [
-          `Current balance: ₹${context.currentBalance.toLocaleString('en-IN')}`,
-          `Projected buffer: ₹${context.projectedBuffer.toLocaleString('en-IN')}`,
-        ],
+    const groundedFacts = [
+      `Current liquid balance: ₹${context.currentBalance.toLocaleString('en-IN')}`,
+      `Monthly income: ₹${context.monthlyIncome.toLocaleString('en-IN')}`,
+      `Projected 30-day buffer: ₹${context.projectedBuffer.toLocaleString('en-IN')}`,
+      `Peak pressure: Week 3 (accumulated rent + EMI + living expenses)`,
+      `Upcoming commitments: Rent (₹12,000), EMI (₹6,500), Utilities (₹1,500), Health Insurance (₹12,000)`,
+    ];
+
+    const q = query.toLowerCase();
+    let actionSuggestion: {
+      type: 'simulate_tx' | 'simulate_loan' | 'view_commitments' | 'view_forecast';
+      payload?: any;
+      label: string;
+    } | undefined;
+
+    if (q.includes('loan') || q.includes('lakh') || q.includes('emi')) {
+      actionSuggestion = {
+        type: 'simulate_loan',
+        payload: { principal: 200000, interest: 12, tenure: 36 },
+        label: 'Model ₹2 Lakh Loan in What-If',
       };
-    } catch (err) {
-      return this.fallback.handleCopilotQuery(query, context);
+    } else if (q.includes('spend') || q.includes('purchase') || q.includes('buy')) {
+      const match = query.match(/\d+(?:,\d+)?/);
+      const amt = match ? parseInt(match[0].replace(/,/g, ''), 10) : 3000;
+      actionSuggestion = {
+        type: 'simulate_tx',
+        payload: { amount: amt, category: 'Shopping', type: 'expense' },
+        label: `Simulate ₹${amt.toLocaleString('en-IN')} Spend`,
+      };
+    } else if (q.includes('week 3') || q.includes('pressure') || q.includes('forecast') || q.includes('chart')) {
+      actionSuggestion = {
+        type: 'view_forecast',
+        label: 'Inspect Week 3 Forecast',
+      };
+    } else if (q.includes('insurance') || q.includes('commitment') || q.includes('bill') || q.includes('rent')) {
+      actionSuggestion = {
+        type: 'view_commitments',
+        label: 'Review Scheduled Commitments',
+      };
     }
+
+    const systemPrompt = `You are Paytm CashFlow AI Copilot. You provide concise, financially grounded advice based on the user's verified financial facts:
+Available Balance: ₹${context.currentBalance}
+Monthly Salary: ₹${context.monthlyIncome}
+Projected Month-end Buffer: ₹${context.projectedBuffer}
+Lowest Balance Floor: ₹${context.lowestProjectedBalance} in Week 3
+Scheduled Commitments: Rent ₹12,000 (paid 5th), Appliance EMI ₹6,500 (paid 12th), Broadband ₹1,500 (due 20th), Health Insurance renewal ₹12,000 (due 25th).
+Answer in 2-3 helpful, precise sentences. Always include exact rupee figures when relevant.`;
+
+    const aiAnswer = await this.callChatCompletion(systemPrompt, query, 200);
+    if (aiAnswer) {
+      return {
+        answer: aiAnswer,
+        actionSuggestion,
+        groundedFacts,
+      };
+    }
+
+    return this.fallback.handleCopilotQuery(query, context);
   }
 }
 

@@ -221,9 +221,12 @@ export default function App() {
   const handleFetchReportData = async (period: ReportPeriod): Promise<ReportData> => {
     try {
       const res = await fetch(`/api/report?period=${period}`);
-      if (res.ok) {
+      const contentType = res.headers.get('content-type');
+      if (res.ok && contentType && contentType.includes('application/json')) {
         const data = await res.json();
-        return data.report;
+        if (data && data.report) {
+          return data.report;
+        }
       }
     } catch (err) {
       console.error('Fetch report error:', err);
