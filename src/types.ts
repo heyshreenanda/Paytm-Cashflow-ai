@@ -13,6 +13,7 @@ export type TransactionCategory =
   | 'Other';
 
 export type TransactionType = 'expense' | 'income';
+
 export type TransactionStatus = 'completed' | 'pending' | 'simulated';
 
 export interface User {
@@ -22,7 +23,7 @@ export interface User {
   monthlyIncome: number;
   currentBalance: number;
   typicalDiscretionarySpending: number;
-  creditScoreDemo?: number; // Labeled clearly as Demo/User-provided
+  creditScoreDemo?: number;
 }
 
 export interface Transaction {
@@ -37,6 +38,7 @@ export interface Transaction {
 }
 
 export type CommitmentStatus = 'PAID' | 'UPCOMING' | 'DUE SOON' | 'SIMULATED';
+
 export type FrequencyType = 'Monthly' | 'Quarterly' | 'Half-yearly' | 'Annual';
 
 export interface Commitment {
@@ -68,14 +70,14 @@ export interface Loan {
   name: string;
   principal: number;
   interestRate: number;
-  tenure: number; // months
+  tenure: number;
   emi: number;
   startDate: string;
   remainingTenure?: number;
 }
 
 export interface ForecastPoint {
-  period: string; // 'Today' | 'Week 1' | 'Week 2' | 'Week 3' | 'Week 4'
+  period: string;
   label: string;
   date: string;
   projectedBalance: number;
@@ -186,11 +188,21 @@ export interface ReportData {
   generatedAt: string;
   snapshot: FinancialSnapshot;
   moneyFlow: MoneyFlowData;
-  spendingByCategory: { category: string; amount: number; percentage: number; changeVsPrior: number }[];
+  spendingByCategory: {
+    category: string;
+    amount: number;
+    percentage: number;
+    changeVsPrior: number;
+  }[];
   commitments: Commitment[];
   insurancePolicies: InsurancePolicy[];
   forecast: ForecastPoint[];
-  pressurePeriods: { period: string; level: string; reason: string; buffer: number }[];
+  pressurePeriods: {
+    period: string;
+    level: string;
+    reason: string;
+    buffer: number;
+  }[];
   aiFinancialBrief: string;
   notableChanges: string[];
   transactions: Transaction[];

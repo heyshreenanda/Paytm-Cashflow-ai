@@ -5,7 +5,7 @@ import {
   InsurancePolicy,
   Loan,
   FinancialInsight,
-} from '../types';
+} from '../types.js';
 
 export const DEMO_USER: User = {
   id: 'usr_paytm_demo_01',
@@ -145,7 +145,8 @@ export const INITIAL_INSIGHTS: FinancialInsight[] = [
     title: 'Shopping Velocity Up +18% vs Last Cycle',
     description:
       'E-commerce transactions (Amazon, Flipkart) reached ₹4,200 across 6 orders, running 18% higher than typical bi-weekly pace.',
-    whyDetails: 'Festive sale season promotions and electronics accessories purchased in early September.',
+    whyDetails:
+      'Festive sale season promotions and electronics accessories purchased in early September.',
     impactSummary: 'Consuming approximately 8% of monthly income allocation.',
     actionType: 'view_whatif',
     actionLabel: 'Model 10% Cut',
@@ -471,7 +472,8 @@ export const initialSnapshot = {
   cashFlowHealth: 72,
   lowestProjectedBalance: 6400,
   peakPressurePeriod: 'Week 3 (Days 15-21)',
-  peakPressureReason: 'Upcoming obligations + existing EMI + typical mid-month spending',
+  peakPressureReason:
+    'Upcoming obligations + existing EMI + typical mid-month spending',
   hasActiveSimulation: false,
   healthBreakdown: [
     {
@@ -651,4 +653,3 @@ export const initialMoneyFlow = {
   totalOutflow: 42500,
   remainingBuffer: 9500,
 };
-
