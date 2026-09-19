@@ -295,7 +295,7 @@ export class GroqAIService implements AIService {
         const { GoogleGenAI } = await import('@google/genai');
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
         const response = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
+          model: 'gemini-2.5-flash',
           contents: `${systemPrompt}\n\nUser request: ${userPrompt}`,
         });
         if (response.text) return response.text.trim();
