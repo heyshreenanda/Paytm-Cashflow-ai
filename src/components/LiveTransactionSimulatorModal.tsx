@@ -271,8 +271,8 @@ export const LiveTransactionSimulatorModal: React.FC<LiveTransactionSimulatorMod
                 <div className="text-base font-extrabold text-white mt-0.5 transition-all duration-300">
                   ₹{newBalance.toLocaleString('en-IN')}
                 </div>
-                <div className="text-[10px] font-bold text-rose-400 mt-1">
-                  {txType === 'expense' ? `-${amount.toLocaleString('en-IN')}` : `+${amount.toLocaleString('en-IN')}`}
+                <div className={`text-[10px] font-bold mt-1 ${txType === 'expense' ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  {txType === 'expense' ? `-₹${amount.toLocaleString('en-IN')}` : `+₹${amount.toLocaleString('en-IN')}`}
                 </div>
               </div>
 
@@ -287,8 +287,8 @@ export const LiveTransactionSimulatorModal: React.FC<LiveTransactionSimulatorMod
                 }`}>
                   ₹{newBuffer.toLocaleString('en-IN')}
                 </div>
-                <div className="text-[10px] font-bold text-slate-400 mt-1">
-                  Month-end safety floor
+                <div className={`text-[10px] font-bold mt-1 ${txType === 'expense' ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  {txType === 'expense' ? `-₹${amount.toLocaleString('en-IN')}` : `+₹${amount.toLocaleString('en-IN')}`} safety buffer
                 </div>
               </div>
 
@@ -299,9 +299,21 @@ export const LiveTransactionSimulatorModal: React.FC<LiveTransactionSimulatorMod
                   Moderate
                 </div>
                 <div className={`text-base font-extrabold mt-0.5 ${
-                  amount >= 3000 && txType === 'expense' ? 'text-rose-400' : 'text-amber-400'
+                  txType === 'income'
+                    ? 'text-emerald-400'
+                    : amount >= 5000
+                    ? 'text-rose-400'
+                    : amount >= 2500
+                    ? 'text-amber-400'
+                    : 'text-slate-200'
                 }`}>
-                  {amount >= 3000 && txType === 'expense' ? 'Higher Pressure' : 'Moderate'}
+                  {txType === 'income'
+                    ? 'Eased Margin'
+                    : amount >= 5000
+                    ? 'High Pressure'
+                    : amount >= 2500
+                    ? 'Elevated'
+                    : 'Moderate'}
                 </div>
                 <div className="text-[10px] font-medium text-slate-400 mt-1">
                   Days 15–21 cycle
@@ -317,19 +329,23 @@ export const LiveTransactionSimulatorModal: React.FC<LiveTransactionSimulatorMod
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-300">
                 <span className="rounded-md bg-slate-800 px-2.5 py-1 text-white font-semibold">
-                  ₹{amount.toLocaleString('en-IN')} {category}
+                  {txType === 'income' ? `+₹${amount.toLocaleString('en-IN')}` : `₹${amount.toLocaleString('en-IN')}`} {category}
                 </span>
                 <ArrowRight className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
-                <span className="rounded-md bg-slate-800 px-2.5 py-1 text-rose-300">
-                  Balance -₹{amount.toLocaleString('en-IN')}
+                <span className={`rounded-md bg-slate-800 px-2.5 py-1 font-semibold ${txType === 'income' ? 'text-emerald-300' : 'text-rose-300'}`}>
+                  Balance {txType === 'income' ? `+₹${amount.toLocaleString('en-IN')}` : `-₹${amount.toLocaleString('en-IN')}`}
                 </span>
                 <ArrowRight className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
-                <span className="rounded-md bg-slate-800 px-2.5 py-1 text-amber-300">
-                  Projected buffer -₹{amount.toLocaleString('en-IN')}
+                <span className={`rounded-md bg-slate-800 px-2.5 py-1 font-semibold ${txType === 'income' ? 'text-emerald-300' : 'text-amber-300'}`}>
+                  Projected buffer {txType === 'income' ? `+₹${amount.toLocaleString('en-IN')}` : `-₹${amount.toLocaleString('en-IN')}`}
                 </span>
                 <ArrowRight className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
-                <span className="rounded-md bg-rose-500/20 border border-rose-500/30 px-2.5 py-1 text-rose-300 font-bold">
-                  Future cash-flow pressure increases
+                <span className={`rounded-md border px-2.5 py-1 font-bold ${
+                  txType === 'income'
+                    ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                    : 'bg-rose-500/20 border-rose-500/30 text-rose-300'
+                }`}>
+                  {txType === 'income' ? 'Future cash-flow safety reserve expands' : 'Future cash-flow pressure increases'}
                 </span>
               </div>
             </div>
@@ -342,7 +358,9 @@ export const LiveTransactionSimulatorModal: React.FC<LiveTransactionSimulatorMod
               </div>
               <p className="text-xs leading-relaxed text-slate-300">
                 {impact?.aiExplanation ||
-                  `Your simulated ₹${amount.toLocaleString('en-IN')} ${category.toLowerCase()} expense reduces your projected buffer by ₹${amount.toLocaleString('en-IN')}. Because existing commitments already create pressure around Week 3, this leaves less room for discretionary spending.`}
+                  (txType === 'income'
+                    ? `Your simulated ₹${amount.toLocaleString('en-IN')} inflow increases your projected buffer to ₹${newBuffer.toLocaleString('en-IN')}, expanding liquidity margin across Week 3.`
+                    : `Your simulated ₹${amount.toLocaleString('en-IN')} ${category.toLowerCase()} expense reduces your projected buffer to ₹${newBuffer.toLocaleString('en-IN')}. Because commitments already create pressure around Week 3, this leaves less room for discretionary spending.`)}
               </p>
             </div>
           </div>

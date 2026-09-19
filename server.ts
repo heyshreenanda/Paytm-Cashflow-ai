@@ -50,24 +50,105 @@ class DemoStore {
 
 const store = new DemoStore();
 
-function buildStructuredContext(): StructuredFinancialContext {
-  const currentBal = calculateBalance(store.user.currentBalance, store.transactions, true);
-  const commitments = store.commitments;
-  const forecast = calculateForecast(currentBal, store.user.monthlyIncome, commitments);
-  const lowestBal = Math.min(...forecast.map((p) => p.scenarioBalance ?? p.projectedBalance));
+function computeCurrentState(store: DemoStore) {
+  // 1. Base balance without any simulated transactions
+  const baseBal = calculateBalance(store.user.currentBalance, store.transactions, false);
+
+  // 2. Active simulated transaction details
+  const activeTx = store.activeSimulationTx;
+  const isExpense = activeTx?.type === 'expense';
+  const isIncome = activeTx?.type === 'income';
+  const simAmount = activeTx ? activeTx.amount : 0;
+  const simDelta = activeTx ? (isIncome ? simAmount : -simAmount) : 0;
+
+  // 3. Effective available balance (reflects simulation if active)
+  const currentBal = baseBal + simDelta;
+
+  // 4. Base buffer is 9,500. Under simulation, it moves by simDelta
+  const baseBuffer = 9500;
+  const projectedBuf = baseBuffer + simDelta;
+
+  // 5. Monthly expenses: base ~39,500 + simulated expense
+  const baseExpenses = 39500;
+  const monthlyExp = baseExpenses + (isExpense ? simAmount : 0);
+
+  // 6. Forecast calculation:
+  // Pass baseBal as starting balance, and simExpense / simIncome
+  const simExpense = isExpense ? simAmount : 0;
+  const simIncome = isIncome ? simAmount : 0;
+  const forecast = calculateForecast(baseBal, store.user.monthlyIncome, store.commitments, simExpense, simIncome);
+
+  // 7. Lowest balance in forecast (taking the simulated scenario balance into account)
+  const lowestBal = Math.min(...forecast.map((p) => (activeTx ? (p.scenarioBalance ?? p.projectedBalance) : p.projectedBalance)));
+
+  // 8. Health calculation using the effective (simulated) balance, buffer, and lowest balance
   const health = calculateFinancialHealth(
     currentBal,
-    store.user.monthlyIncome - 42500, // projected buffer base
+    projectedBuf,
     store.user.monthlyIncome,
-    commitments,
+    store.commitments,
     lowestBal
   );
+
+  // 9. Money flow diagram data reflecting updated buffer and transactions
+  const moneyFlow = calculateMoneyFlow(
+    store.user.monthlyIncome,
+    store.commitments,
+    store.transactions,
+    projectedBuf
+  );
+
+  // 10. Dynamic peak pressure reason if simulation is active
+  let peakPressureReason = 'Upcoming obligations + existing EMI + typical mid-month spending';
+  if (activeTx) {
+    if (isExpense) {
+      peakPressureReason = `Simulated ₹${simAmount.toLocaleString('en-IN')} ${activeTx.category} spend tightens Week 3 headroom before insurance renewal.`;
+    } else {
+      peakPressureReason = `Simulated ₹${simAmount.toLocaleString('en-IN')} inflow expands Week 3 safety margin.`;
+    }
+  }
+
+  return {
+    user: store.user,
+    snapshot: {
+      availableBalance: currentBal,
+      baselineBalance: baseBal,
+      simulatedDelta: simDelta,
+      monthlyIncome: store.user.monthlyIncome,
+      monthlyExpenses: monthlyExp,
+      projectedBuffer: projectedBuf,
+      baselineBuffer: baseBuffer,
+      cashFlowHealth: health.score,
+      lowestProjectedBalance: lowestBal,
+      peakPressurePeriod: 'Week 3 (Days 15–21)',
+      peakPressureReason,
+      hasActiveSimulation: Boolean(activeTx),
+    },
+    transactions: store.transactions,
+    commitments: store.commitments,
+    insurance: store.insurance,
+    loans: store.loans,
+    forecast,
+    health,
+    insights: INITIAL_INSIGHTS,
+    moneyFlow,
+    activeSimulationTx: store.activeSimulationTx,
+  };
+}
+
+function buildStructuredContext(): StructuredFinancialContext {
+  const state = computeCurrentState(store);
+  const currentBal = state.snapshot.availableBalance;
+  const commitments = store.commitments;
+  const forecast = state.forecast;
+  const lowestBal = state.snapshot.lowestProjectedBalance;
+  const health = state.health;
 
   return {
     currentBalance: currentBal,
     monthlyIncome: store.user.monthlyIncome,
-    monthlyExpenses: calculateMonthlyExpenses(store.transactions, commitments),
-    projectedBuffer: 9500,
+    monthlyExpenses: state.snapshot.monthlyExpenses,
+    projectedBuffer: state.snapshot.projectedBuffer,
     lowestProjectedBalance: lowestBal,
     healthScore: health.score,
     commitments: commitments.map((c) => ({
@@ -91,10 +172,10 @@ function buildStructuredContext(): StructuredFinancialContext {
       tenure: l.tenure,
     })),
     forecastSummary: {
-      w1Balance: forecast[1]?.projectedBalance ?? 12500,
-      w2Balance: forecast[2]?.projectedBalance ?? 9000,
-      w3Balance: forecast[3]?.projectedBalance ?? 6400,
-      w4Balance: forecast[4]?.projectedBalance ?? 9500,
+      w1Balance: forecast[1]?.scenarioBalance ?? forecast[1]?.projectedBalance ?? 12500,
+      w2Balance: forecast[2]?.scenarioBalance ?? forecast[2]?.projectedBalance ?? 9000,
+      w3Balance: forecast[3]?.scenarioBalance ?? forecast[3]?.projectedBalance ?? 6400,
+      w4Balance: forecast[4]?.scenarioBalance ?? forecast[4]?.projectedBalance ?? 9500,
       pressureWeek: 'Week 3',
       pressureReasons: [
         'Rent on 5th (₹12,000) and EMI on 12th (₹6,500) cleared',
@@ -123,47 +204,8 @@ async function startServer() {
 
   // 2. Get full state
   app.get('/api/state', (req, res) => {
-    const currentBal = calculateBalance(store.user.currentBalance, store.transactions, true);
-    const monthlyExp = 39500;
-    const projectedBuf = 9500;
-    const forecast = calculateForecast(currentBal, store.user.monthlyIncome, store.commitments);
-    const lowestBal = Math.min(...forecast.map((p) => p.scenarioBalance ?? p.projectedBalance));
-    const health = calculateFinancialHealth(
-      currentBal,
-      projectedBuf,
-      store.user.monthlyIncome,
-      store.commitments,
-      lowestBal
-    );
-    const moneyFlow = calculateMoneyFlow(
-      store.user.monthlyIncome,
-      store.commitments,
-      store.transactions,
-      projectedBuf
-    );
-
-    res.json({
-      user: store.user,
-      snapshot: {
-        availableBalance: currentBal,
-        monthlyIncome: store.user.monthlyIncome,
-        monthlyExpenses: monthlyExp,
-        projectedBuffer: projectedBuf,
-        cashFlowHealth: health.score,
-        lowestProjectedBalance: lowestBal,
-        peakPressurePeriod: 'Week 3',
-        peakPressureReason: 'Upcoming obligations + existing EMI + typical spending',
-      },
-      transactions: store.transactions,
-      commitments: store.commitments,
-      insurance: store.insurance,
-      loans: store.loans,
-      forecast,
-      health,
-      insights: INITIAL_INSIGHTS,
-      moneyFlow,
-      activeSimulationTx: store.activeSimulationTx,
-    });
+    const state = computeCurrentState(store);
+    res.json(state);
   });
 
   // 3. Live Transaction Simulator endpoint
@@ -172,20 +214,21 @@ async function startServer() {
       const { amount, category = 'Shopping', date = 'Today', type = 'expense' } = req.body;
       const numAmount = Math.max(1, Number(amount) || 3000);
 
-      const currentBal = calculateBalance(store.user.currentBalance, store.transactions, false);
-      const currentBuf = 9500;
+      const baseBal = calculateBalance(store.user.currentBalance, store.transactions, false);
+      const baseBuf = 9500;
+      const scenarioType = type === 'income' ? 'income' : 'transaction';
 
-      const impact = calculateScenarioImpact('transaction', numAmount, {
+      const impact = calculateScenarioImpact(scenarioType, numAmount, {
         category,
-        currentBalance: currentBal,
-        currentBuffer: currentBuf,
+        currentBalance: baseBal,
+        currentBuffer: baseBuf,
         monthlyIncome: store.user.monthlyIncome,
         commitments: store.commitments,
       });
 
       const structuredContext = buildStructuredContext();
       structuredContext.scenario = {
-        type: 'transaction',
+        type: scenarioType,
         amount: numAmount,
         category,
       };
@@ -205,7 +248,7 @@ async function startServer() {
       const simulatedTx: Transaction = {
         id: `sim_tx_${Date.now()}`,
         date: `${date}, ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`,
-        merchant: `Simulated: ${category} Payment`,
+        merchant: `Simulated: ${category} ${type === 'income' ? 'Inflow' : 'Payment'}`,
         category,
         amount: numAmount,
         type: type as any,
@@ -233,13 +276,15 @@ async function startServer() {
       // Prepend to transaction list
       store.transactions = [simulatedTx, ...store.transactions.filter((t) => t.id !== simulatedTx.id)];
     }
-    res.json({ success: true, activeSimulationTx: store.activeSimulationTx });
+    const state = computeCurrentState(store);
+    res.json({ success: true, ...state });
   });
 
   // 5. Reset simulation to baseline demo state
   app.post('/api/reset-simulation', (req, res) => {
     store.reset();
-    res.json({ success: true, message: 'Restored baseline demo state.' });
+    const state = computeCurrentState(store);
+    res.json({ success: true, ...state, message: 'Restored baseline demo state.' });
   });
 
   // 6. Unified What-If Scenario engine
@@ -368,9 +413,7 @@ async function startServer() {
         { category: 'Education', amount: categoryTotals.Education || 3290, percentage: 8, changeVsPrior: 12 },
       ];
 
-      const currentBal = calculateBalance(store.user.currentBalance, store.transactions, true);
-      const forecast = calculateForecast(currentBal, store.user.monthlyIncome, store.commitments);
-      const moneyFlow = calculateMoneyFlow(store.user.monthlyIncome, store.commitments, store.transactions, 9500);
+      const state = computeCurrentState(store);
 
       const reportData: ReportData = {
         period: period as ReportPeriod,
@@ -382,33 +425,26 @@ async function startServer() {
           hour: '2-digit',
           minute: '2-digit',
         }),
-        snapshot: {
-          availableBalance: currentBal,
-          monthlyIncome: store.user.monthlyIncome,
-          monthlyExpenses: 39500,
-          projectedBuffer: 9500,
-          cashFlowHealth: 72,
-          lowestProjectedBalance: 6400,
-          peakPressurePeriod: 'Week 3',
-          peakPressureReason: 'Rent on 5th and EMI on 12th cleared, utility due on 20th',
-        },
-        moneyFlow,
+        snapshot: state.snapshot,
+        moneyFlow: state.moneyFlow,
         spendingByCategory,
         commitments: store.commitments,
         insurancePolicies: store.insurance,
-        forecast,
+        forecast: state.forecast,
         pressurePeriods: [
           {
             period: 'Week 3 (15–21 Sep)',
-            level: 'Moderate-High',
-            reason: 'Rent & EMI already executed; broadband bills + living spend tighten liquid buffer.',
-            buffer: 6400,
+            level: state.snapshot.hasActiveSimulation ? 'High' : 'Moderate-High',
+            reason: state.snapshot.hasActiveSimulation
+              ? `Simulation of ₹${state.activeSimulationTx?.amount.toLocaleString('en-IN')} active; lowest buffer margin at ₹${state.snapshot.lowestProjectedBalance.toLocaleString('en-IN')}.`
+              : 'Rent & EMI already executed; broadband bills + living spend tighten liquid buffer.',
+            buffer: state.snapshot.lowestProjectedBalance,
           },
           {
             period: 'Week 4 (25 Sep)',
             level: 'Moderate',
             reason: 'Care Health annual insurance renewal (₹12,000) scheduled.',
-            buffer: 9500,
+            buffer: state.snapshot.projectedBuffer,
           },
         ],
         aiFinancialBrief,
@@ -416,7 +452,9 @@ async function startServer() {
           'Shopping increased +18% due to e-commerce festive promos',
           'Food spending decreased -4% with more home dining in Week 2',
           'Recurring obligations (Rent ₹12,000, EMI ₹6,500) cleared on schedule',
-          'Projected month-end buffer stable at ₹9,500 before simulation overrides',
+          state.snapshot.hasActiveSimulation
+            ? `Active simulation in session: ${state.activeSimulationTx?.merchant} (₹${state.activeSimulationTx?.amount.toLocaleString('en-IN')})`
+            : 'Projected month-end buffer stable at ₹9,500 before simulation overrides',
         ],
         transactions: store.transactions.slice(0, 15),
         hasSimulation: Boolean(store.activeSimulationTx),

@@ -96,7 +96,12 @@ export const CashFlowView: React.FC<CashFlowViewProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                Liquid cash-flow reaches its lowest buffer margin of <strong>₹6,400</strong> during this period.
+                Liquid cash-flow reaches its lowest buffer margin of <strong className="text-amber-300">₹{snapshot.lowestProjectedBalance.toLocaleString('en-IN')}</strong> during this period.
+                {snapshot.hasActiveSimulation && (
+                  <span className="ml-1.5 rounded bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-bold text-amber-300">
+                    Reflects active simulation
+                  </span>
+                )}
               </p>
             </div>
           </div>

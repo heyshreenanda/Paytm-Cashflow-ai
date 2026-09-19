@@ -119,13 +119,17 @@ export interface FinancialInsight {
 
 export interface FinancialSnapshot {
   availableBalance: number;
+  baselineBalance?: number;
+  simulatedDelta?: number;
   monthlyIncome: number;
   monthlyExpenses: number;
   projectedBuffer: number;
+  baselineBuffer?: number;
   cashFlowHealth: number;
   lowestProjectedBalance: number;
   peakPressurePeriod: string;
   peakPressureReason: string;
+  hasActiveSimulation?: boolean;
 }
 
 export interface ScenarioImpact {

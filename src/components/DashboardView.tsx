@@ -112,7 +112,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             ₹{snapshot.availableBalance.toLocaleString('en-IN')}
           </div>
           <div className="mt-2 flex items-center text-[10px] text-slate-400">
-            <span>Liquid in demo account</span>
+            {hasActiveSimulation && snapshot.baselineBalance !== undefined ? (
+              <span className="font-semibold text-amber-400">
+                Baseline: ₹{snapshot.baselineBalance.toLocaleString('en-IN')} ({snapshot.simulatedDelta && snapshot.simulatedDelta < 0 ? `-₹${Math.abs(snapshot.simulatedDelta).toLocaleString('en-IN')}` : `+₹${(snapshot.simulatedDelta || 0).toLocaleString('en-IN')}`})
+              </span>
+            ) : (
+              <span>Liquid in demo account</span>
+            )}
           </div>
         </div>
 
@@ -140,7 +146,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             ₹{snapshot.monthlyExpenses.toLocaleString('en-IN')}
           </div>
           <div className="mt-2 flex items-center text-[10px] text-slate-400">
-            <span>Fixed + Discretionary</span>
+            {hasActiveSimulation && activeSimulationTx && activeSimulationTx.type === 'expense' ? (
+              <span className="font-semibold text-rose-400">
+                Includes +₹{activeSimulationTx.amount.toLocaleString('en-IN')} simulated
+              </span>
+            ) : (
+              <span>Fixed + Discretionary</span>
+            )}
           </div>
         </div>
 
@@ -154,7 +166,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             ₹{snapshot.projectedBuffer.toLocaleString('en-IN')}
           </div>
           <div className="mt-2 flex items-center text-[10px] text-slate-300 font-medium">
-            <span>Safety margin at month-end</span>
+            {hasActiveSimulation && snapshot.baselineBuffer !== undefined ? (
+              <span className="font-semibold text-amber-400">
+                Baseline: ₹{snapshot.baselineBuffer.toLocaleString('en-IN')} ({snapshot.simulatedDelta && snapshot.simulatedDelta < 0 ? `-₹${Math.abs(snapshot.simulatedDelta).toLocaleString('en-IN')}` : `+₹${(snapshot.simulatedDelta || 0).toLocaleString('en-IN')}`})
+              </span>
+            ) : (
+              <span>Safety margin at month-end</span>
+            )}
           </div>
         </div>
 
@@ -169,6 +187,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {snapshot.cashFlowHealth}
             </span>
             <span className="text-xs font-bold text-slate-500">/100</span>
+            {hasActiveSimulation && (
+              <span className="ml-1 text-[10px] font-bold text-amber-400">
+                (Simulated)
+              </span>
+            )}
           </div>
           <button
             onClick={onOpenHealthModal}
@@ -188,14 +211,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-amber-300">
-                WEEK 3 FORECAST: POTENTIAL CASH-FLOW PRESSURE
+                WEEK 3 FORECAST: {hasActiveSimulation ? 'ELEVATED SIMULATION PRESSURE' : 'POTENTIAL CASH-FLOW PRESSURE'}
               </span>
               <span className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-400">
                 AI PREDICTION
               </span>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
-              Upcoming obligations (Utility ₹1,500 on 20th) + existing EMI (₹6,500 on 12th) + typical mid-month living spending reduce liquidity before late-month health insurance (₹12,000 on 25th).
+              {hasActiveSimulation && activeSimulationTx
+                ? `Active simulation (₹${activeSimulationTx.amount.toLocaleString('en-IN')} ${activeSimulationTx.category}) adjusts your Week 3 lowest balance floor to ₹${snapshot.lowestProjectedBalance.toLocaleString('en-IN')}. ${snapshot.peakPressureReason}`
+                : 'Upcoming obligations (Utility ₹1,500 on 20th) + existing EMI (₹6,500 on 12th) + typical mid-month living spending reduce liquidity before late-month health insurance (₹12,000 on 25th).'}
             </p>
           </div>
         </div>

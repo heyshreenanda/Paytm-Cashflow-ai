@@ -40,6 +40,8 @@ import {
 import {
   calculateFinancialHealth,
   calculateScenarioImpact,
+  calculateForecast,
+  calculateMoneyFlow,
 } from './services/financialEngine';
 import { AlertTriangle } from 'lucide-react';
 
@@ -147,22 +149,64 @@ export default function App() {
   // Apply simulated transaction to session
   const handleApplySimulation = async (simulatedTx: Transaction, _impact: ScenarioImpact) => {
     try {
-      await fetch('/api/apply-simulation', {
+      const res = await fetch('/api/apply-simulation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ simulatedTx }),
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.snapshot) {
+          setSnapshot(data.snapshot);
+          setForecast(data.forecast);
+          setCommitments(data.commitments);
+          setTransactions(data.transactions);
+          setInsurance(data.insurance);
+          setMoneyFlow(data.moneyFlow);
+          setInsights(data.insights);
+          setHasActiveSimulation(Boolean(data.activeSimulationTx));
+          setActiveSimulationTx(data.activeSimulationTx);
+          return;
+        }
+      }
       await fetchState();
     } catch (err) {
       console.error('Apply simulation error:', err);
       // Fallback local update
+      const isExpense = simulatedTx.type === 'expense';
+      const simDelta = isExpense ? -simulatedTx.amount : simulatedTx.amount;
+      const baseBal = snapshot.baselineBalance ?? snapshot.availableBalance;
+      const baseBuf = snapshot.baselineBuffer ?? snapshot.projectedBuffer;
+      const newBal = baseBal + simDelta;
+      const newBuf = baseBuf + simDelta;
+      const updatedTxList = [simulatedTx, ...transactions.filter((t) => t.id !== simulatedTx.id)];
+      const updatedForecast = calculateForecast(
+        baseBal,
+        snapshot.monthlyIncome,
+        commitments,
+        isExpense ? simulatedTx.amount : 0,
+        !isExpense ? simulatedTx.amount : 0
+      );
+      const lowestBal = Math.min(...updatedForecast.map((p) => p.scenarioBalance ?? p.projectedBalance));
+      const health = calculateFinancialHealth(newBal, newBuf, snapshot.monthlyIncome, commitments, lowestBal);
+      const moneyFlowData = calculateMoneyFlow(snapshot.monthlyIncome, commitments, updatedTxList, newBuf);
+
       setActiveSimulationTx(simulatedTx);
       setHasActiveSimulation(true);
-      setTransactions((prev) => [simulatedTx, ...prev]);
+      setTransactions(updatedTxList);
+      setForecast(updatedForecast);
+      setMoneyFlow(moneyFlowData);
       setSnapshot((prev) => ({
         ...prev,
-        availableBalance: prev.availableBalance - simulatedTx.amount,
-        projectedBuffer: prev.projectedBuffer - simulatedTx.amount,
+        availableBalance: newBal,
+        baselineBalance: baseBal,
+        simulatedDelta: simDelta,
+        projectedBuffer: newBuf,
+        baselineBuffer: baseBuf,
+        monthlyExpenses: prev.monthlyExpenses + (isExpense ? simulatedTx.amount : 0),
+        cashFlowHealth: health.score,
+        lowestProjectedBalance: lowestBal,
+        hasActiveSimulation: true,
       }));
     }
   };
@@ -170,7 +214,22 @@ export default function App() {
   // Reset Simulation
   const handleResetSimulation = async () => {
     try {
-      await fetch('/api/reset-simulation', { method: 'POST' });
+      const res = await fetch('/api/reset-simulation', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.snapshot) {
+          setSnapshot(data.snapshot);
+          setForecast(data.forecast);
+          setCommitments(data.commitments);
+          setTransactions(data.transactions);
+          setInsurance(data.insurance);
+          setMoneyFlow(data.moneyFlow);
+          setInsights(data.insights);
+          setHasActiveSimulation(Boolean(data.activeSimulationTx));
+          setActiveSimulationTx(data.activeSimulationTx);
+          return;
+        }
+      }
       await fetchState();
     } catch (err) {
       console.error('Reset simulation error:', err);
@@ -179,6 +238,7 @@ export default function App() {
       setSnapshot(initialSnapshot);
       setTransactions(initialTransactions);
       setForecast(initialForecast);
+      setMoneyFlow(initialMoneyFlow);
     }
   };
 

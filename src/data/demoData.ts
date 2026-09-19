@@ -462,13 +462,17 @@ export const initialInsights = INITIAL_INSIGHTS;
 
 export const initialSnapshot = {
   availableBalance: 28000,
+  baselineBalance: 28000,
+  simulatedDelta: 0,
   monthlyIncome: 52000,
   monthlyExpenses: 39500,
   projectedBuffer: 9500,
+  baselineBuffer: 9500,
   cashFlowHealth: 72,
   lowestProjectedBalance: 6400,
   peakPressurePeriod: 'Week 3 (Days 15-21)',
   peakPressureReason: 'Upcoming obligations + existing EMI + typical mid-month spending',
+  hasActiveSimulation: false,
   healthBreakdown: [
     {
       factorName: 'Projected Buffer Margin',
